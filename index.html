@@ -26,17 +26,32 @@
             const token = await getToken();
             const url = "ws://localhost:7880";
 
-            const room = await new LivekitClient.Room().connect(url, token);
+            try {
+                const room = new LivekitClient.Room();
 
-            console.log("connected to", room.name);
+                await room.connect(url, token);
 
-            room.on("participantConnected", (p) => {
-                console.log("new participant", p.identity);
-            });
+                console.log("connected to room", room.name);
 
-            room.participants.forEach((p) => {
-                console.log("already in room", p.identity);
-            });
+                room.participants.forEach((participant) => {
+                    participant.tracks.forEach((trackPub) => {
+                        if (trackPub.isSubscribed) {
+                            document.body.appendChild(trackPub.track.attach());
+                        }
+                    });
+
+                    participant.on("trackSubscribed", (track) => {
+                        document.body.appendChild(track.attach());
+                    });
+                });
+
+                room.on("participantConnected", (participant) => {
+                    console.log("new participant:", participant.identity);
+                });
+
+            } catch (err) {
+                console.error("failed to join room:", err);
+            }
         }
 
         document.getElementById("join").onclick = joinRoom;
