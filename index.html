@@ -6,34 +6,10 @@
 </head>
 <body>
     <button id="join">Join</button>
+    <video id="localVideo" autoplay muted></video>
+    <video id="remoteVideo" autoplay></video>
 
-    <script type="module">
-        console.log("script loaded");
-
-        import {Room} from "https://unpkg.com/livekit-client/dist/livekit-client.esm.mjs";
-
-        document.getElementById("join").onclick = async()=>{
-            console.log("clicked");
-            const res = await fetch("http://localhost:3679/token", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body:JSON.stringify({
-                    room:"campfire",
-                    identity: "astra-" + Math.floor(Math.random() * 1000),
-                })
-            });
-
-            const {token} = await res.json();
-            const room = new Room({
-                rtcConfig:{
-                    iceTransportPolicy: "relay",
-                }
-            });
-
-            await room.connect("ws://localhost:7880", token);
-
-            console.log(`connected to ${room.name}`);
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.16.1/dist/livekit.min.js"></script>
+    <script type="module" src="client.js"></script>
 </body>
 </html>
