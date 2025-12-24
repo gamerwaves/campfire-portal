@@ -6,4 +6,8 @@ rtc:
   use_external_ip: false
 
 keys:
-  devkey: devsecret
+  devkey: c5bf50f8263685f3f25b182b1158237392eaeeee523852e619e91f4935513908
+
+#turn:
+#  enabled: true
+#  domain: localhost

@@ -8,9 +8,12 @@
     <button id="join">Join</button>
 
     <script type="module">
+        console.log("script loaded");
+
         import {Room} from "https://unpkg.com/livekit-client/dist/livekit-client.esm.mjs";
 
         document.getElementById("join").onclick = async()=>{
+            console.log("clicked");
             const res = await fetch("http://localhost:3679/token", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -21,7 +24,11 @@
             });
 
             const {token} = await res.json();
-            const room = new Room();
+            const room = new Room({
+                rtcConfig:{
+                    iceTransportPolicy: "relay",
+                }
+            });
 
             await room.connect("ws://localhost:7880", token);
 
