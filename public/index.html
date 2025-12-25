@@ -3,9 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <title>thing</title>
-  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <section id="join"></section>
+  <div id="join-container">
+    <label>
+      Campfire <input id="event">
+    </label>
+    <button id="join">Join</button>
+  </div>
+
+  <div id="lobby-container" hidden>
+    <h3>campfires online:</h3>
+    <div id="events"></div>
+  </div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="script.js"></script>
 </body>
 </html>

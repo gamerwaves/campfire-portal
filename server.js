@@ -1,6 +1,7 @@
 import express from "express";
 import {createServer} from "http";
 import {Server} from "socket.io";
+import crypto from "crypto"
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,45 +21,58 @@ function serializeEvents(){
 }
 
 io.on("connection", (socket) => {
-    socket.on("join-event", ({eventId, name})=>{
-        socket.data = {eventId, name};
+    socket.on("enter", ({eventId}) => {
+        socket.data.eventId = eventId;
 
-        events[eventId] ??= {users: new Map()};
-        waiting[eventId] ??= new Set();
-
-        events[eventId].users.set(socket.id, name);
+        events[eventId] ??={
+            roomId: null,
+            participants: 0
+        }
 
         io.emit("events-update", serializeEvents());
     });
 
-    socket.on("wait", () =>{
+    socket.on("start-call", ()=>{
         const {eventId} = socket.data;
-        waiting[eventId].add(socket.id);
-        io.emit("events-update", serializeEvents())
-    })
+        const event = events[eventId];
 
-    socket.on("call", ()=>{
+        if(!event.roomId){
+            event.roomId = crypto.randomUUID();
+        }
+
+        event.participants++;
+        socket.emit("events-update", serializeEvents());
+    });
+
+    socket.on("join-existing", ()=>{
         const {eventId} = socket.data;
-        const pool = waiting[eventId];
+        const event = events[eventId];
 
-        const [callee] = pool;
-        if(!callee){return}
+        if(!event.roomId){return}
 
-        pool.delete(callee);
-        io.to([socket.id, callee]).emit("match-found", {
-            roomId: crypto.randomUUID()
-        })
+        event.participants++;
+        socket.emit("join-call", {roomId:event.roomId});
+        io.emit("events-update", serializeEvents());
     })
 
     socket.on("disconnect", ()=>{
         const {eventId} = socket.data || {};
-        if(!eventId) return;
+        if(!eventId || !events[eventId]){return}
 
-        events[eventId]?.users.delet(socket.id);
-        waiting[eventId]?.delete(socket.id);
+        const event = events[eventId];
+
+        if(event.participants > 0){
+            event.participants--;
+        }
+
+        if(event.participants === 0){
+            event.roomId = null;
+        }
 
         io.emit("events-update", serializeEvents());
     })
 })
 
-httpServer.listen(3000);
+httpServer.listen(3386, ()=>{
+    console.log("Server started on port 3386");
+});
