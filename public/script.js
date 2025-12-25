@@ -23,17 +23,26 @@ function renderEvents(events){
         const li = document.createElement("li");
 
         li.innerHTML = `
-        <b>${unslugify(e.id)}</b> - ${e.inCall ? "In call" : "Waiting"} <button ${e.inCall ? "" : "disabled"}></button>`
+        <b>${unslugify(e.id)}</b> - ${e.inCall ? "In call" : "Waiting"} <button ${e.inCall ? "" : "disabled"} data-join>join</button> <button data-start>start call</button>`;
 
+        li.querySelector("[data-start]").onclick = ()=>{
+            socket.emit("start-call");
+        }
+
+        li.querySelector("[data-join]").onclick = ()=>{
+            socket.emit("join-existing");
+        }
+
+        eventsList.appendChild(li);
     }
 }
 
 join.onclick = () =>{
-    const campfireName = campfireName.value.trim();
-    if(!campfireName) return alert("Enter Campfire name");
+    const name = campfireName.value.trim();
+    if(!name) return alert("Enter Campfire name");
 
-    currentEvent = slugify(campfireName);
-    socket = io("https://localhost:3386");
+    currentEvent = slugify(campfireName.value.trim());
+    socket = io("http://localhost:3386");
 
     socket.emit("enter", {eventId: currentEvent});
 

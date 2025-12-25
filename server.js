@@ -15,7 +15,7 @@ const waiting = {};
 function serializeEvents(){
     return Object.entries(events).map(([id,e])=>({
         id,
-        online:e.users.size,
+        inCall: Boolean(e.roomId),
         waiting:waiting[id]?.size ?? 0
     }));
 }
@@ -41,7 +41,8 @@ io.on("connection", (socket) => {
         }
 
         event.participants++;
-        socket.emit("events-update", serializeEvents());
+        socket.emit("join-call", {roomId: event.roomId});
+        io.emit("events-update", serializeEvents());
     });
 
     socket.on("join-existing", ()=>{
