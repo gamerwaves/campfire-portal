@@ -11,6 +11,15 @@ const io = new Server(httpServer,{
 
 const events = {};
 
+function getRandom(eventId){
+    const candidates = Object.entries(events).filter(
+        ([id,e])=>e.roomId&&id!==eventId
+    ).map(([id])=>id);
+
+    if(candidates.length ===0) return null;
+    return candidates[Math.floor(Math.random()*candidates.length)];
+}
+
 function hasSockets(eventId){
     return Array.from(io.sockets.sockets.values()).some(
         socket => socket.data.eventId === eventId
@@ -121,6 +130,25 @@ io.on("connection", (socket) => {
         }
 
         socket.emit("left-call");
+        io.emit("events-update", serializeEvents());
+    })
+
+    socket.on("join-random", ()=>{
+        const {eventId} = socket.data;
+        const targetEventId = getRandom(eventId);
+        if(!targetEventId) return;
+
+        const event = events[targetEventId];
+        if(!event?.roomId) return;
+
+        leaveCall(socket);
+
+        socket.data.inCall = true;
+        socket.data.roomId = event.roomId;
+
+        socket.join(event.roomId);
+        socket.emit("join-call", {roomId: event.roomId});
+
         io.emit("events-update", serializeEvents());
     })
 })

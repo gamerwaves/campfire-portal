@@ -2,6 +2,7 @@ const joinContainer = document.querySelector("#join-container");
 const lobbyContainer = document.querySelector("#lobby-container");
 const eventsList = document.querySelector("#events");
 
+const random = document.getElementById("random");
 const join = document.getElementById("join");
 const campfireName = document.getElementById("event");
 
@@ -44,6 +45,7 @@ function renderEvents(events){
     }
 
     start.disabled = inCall;
+    random.disabled = inCall;
 }
 
 join.onclick = () =>{
@@ -92,4 +94,9 @@ leave.onclick = () =>{
 start.onclick = () =>{
     if(inCall) return;
     socket.emit("start-call", {eventId:currentEvent});
+}
+
+random.onclick = () =>{
+    if(inCall) return;
+    socket.emit("join-random");
 }
