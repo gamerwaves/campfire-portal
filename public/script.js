@@ -59,3 +59,9 @@ join.onclick = () =>{
         alert(`joined call ${roomId}`);
     })
 }
+
+const leave = document.getElementById("leave");
+
+leave.onclick = () =>{
+    socket.emit("leave-call");
+}
