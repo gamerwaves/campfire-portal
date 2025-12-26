@@ -50,23 +50,22 @@ io.on("connection", (socket) => {
         io.emit("events-update", serializeEvents());
     });
 
-    socket.on("start-call", ()=>{
-        const {eventId} = socket.data;
+    socket.on("start-call", ({eventId})=>{
         const event = events[eventId];
-        if(!event) return;
+
+        if(!event.roomId){
+            event.roomId = crypto.randomUUID;
+            event.participate = 0;
+        }
 
         leaveCall(socket);
-
-        if(!event.roomId) {
-            event.roomId = crypto.randomUUID();
-        }
 
         event.participants++;
 
         socket.data.inCall = true;
         socket.data.roomId = event.roomId;
 
-        socket.emit("join-call", {roomId: event.roomId});
+        socket.emit("join-call", {roomId:event.roomId});
         io.emit("events-update", serializeEvents());
     });
 

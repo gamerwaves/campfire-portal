@@ -27,7 +27,7 @@ function renderEvents(events){
 
         li.innerHTML = `
         <b>${unslugify(e.id)}</b> - ${e.inCall ? `(${e.participants})`: "Idle"}
-        <button data-join data-events="${e.id}" ${(!e.inCall || inCall)?"disabled":""}>Join call</button>`;
+        <button data-join data-events="${e.id}" ${(!e.inCall || inCall || (e.id === currentEvent))?"disabled":""}>Join call</button>`;
 
         li.querySelector("[data-join]").onclick = (ev) => {
             const targetEvent = ev.target.dataset.event;
@@ -78,5 +78,5 @@ leave.onclick = () =>{
 
 start.onclick = () =>{
     if(inCall) return;
-    socket.emit("start-call");
+    socket.emit("start-call", {eventId:currentEvent});
 }
