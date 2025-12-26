@@ -80,6 +80,11 @@ join.onclick = () =>{
         alert("The host has left the call");
     })
 
+
+    socket.on("no-random-calls", ()=>{
+        alert("No Campfires active right now - try starting one!");
+    })
+
     joinContainer.hidden = true;
     lobbyContainer.hidden = false;
 }

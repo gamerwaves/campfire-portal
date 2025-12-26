@@ -135,8 +135,13 @@ io.on("connection", (socket) => {
 
     socket.on("join-random", ()=>{
         const {eventId} = socket.data;
+
         const targetEventId = getRandom(eventId);
-        if(!targetEventId) return;
+
+        if(!targetEventId) {
+            socket.emit("no-random-calls");
+            return;
+        }
 
         const event = events[targetEventId];
         if(!event?.roomId) return;
