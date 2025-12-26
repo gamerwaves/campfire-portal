@@ -2,6 +2,7 @@ import express from "express";
 import {createServer} from "http";
 import {Server} from "socket.io";
 import crypto from "crypto"
+import fetch from "node-fetch";
 
 const app = express();
 const httpServer = createServer(app);
@@ -10,6 +11,26 @@ const io = new Server(httpServer,{
 });
 
 const events = {};
+const apiKey = process.env.API_KEY;
+
+async function createRoom(){
+    const res = await fetch("https://api.daily.co/v1/rooms",{
+        method:"POST",
+        headers:{
+            "Authorization":`Bearer ${apiKey}`,
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            properties: {
+                enable_chat: true,
+                start_audio_off: false,
+                start_video_off: false,
+            }
+        })
+    })
+
+    return await res.json();
+}
 
 function getRandom(eventId){
     const candidates = Object.entries(events).filter(
@@ -67,14 +88,15 @@ io.on("connection", (socket) => {
         io.emit("events-update", serializeEvents());
     });
 
-    socket.on("start-call", ({eventId}) => {
+    socket.on("start-call", async ({eventId}) => {
         const event = events[eventId];
-        if(!event) return;
+        if (!event) return;
 
         leaveCall(socket);
 
-        if(!event.roomId){
-            event.roomId = crypto.randomUUID();
+        if (!event.roomId) {
+            const dailyRoom = await createRoom();
+            event.roomId = dailyRoom.url;
             event.hostSocketId = socket.id;
         }
 
