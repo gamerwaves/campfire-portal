@@ -1,3 +1,15 @@
+:root{
+    --black: #1f2d3d;
+    --muted: #8492a6;
+    --white: #eeeeee;
+    --red: #ec3750;
+    --yelow: #f1c40f;
+    --green: #33d6a6;
+    --cyan: #5bc0de;
+    --blue: #338eda;
+    --purple: #a633d6;
+}
+
 #join-container {
     align-items: center;
 }

@@ -36,6 +36,10 @@ function renderEvents(events){
             });
         }
         eventsList.appendChild(li);
+
+        if(e.id === currentEvent){
+            li.style.color =
+        }
     }
 
     start.disabled = inCall;
