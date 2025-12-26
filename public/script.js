@@ -105,3 +105,5 @@ random.onclick = () =>{
     if(inCall) return;
     socket.emit("join-random");
 }
+
+// le stuff
