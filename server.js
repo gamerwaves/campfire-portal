@@ -12,7 +12,7 @@ const io = new Server(httpServer,{
 const events = {};
 
 function hasSockets(eventId){
-    return Array.from(io.sockets.sockets.value()).some(
+    return Array.from(io.sockets.sockets.values()).some(
         socket => socket.data.eventId === eventId
     )
 }
