@@ -70,20 +70,17 @@ io.on("connection", (socket) => {
         io.emit("events-update", serializeEvents());
     });
 
-    socket.on("join-existing", ()=>{
-        const {eventId} = socket.data;
+    socket.on("join-existing", ({eventId})=>{
         const event = events[eventId];
-
-        if(!event?.roomId){return}
+        if(!event?.roomId) return;
 
         leaveCall(socket);
 
-        event.participants++;
-
+        event.participants++
         socket.data.inCall = true;
         socket.data.roomId = event.roomId;
 
-        socket.emit("join-call", {roomId: event.roomId});
+        socket.emit("join-call", {roomId:event.roomId});
         io.emit("events-update", serializeEvents());
     })
 

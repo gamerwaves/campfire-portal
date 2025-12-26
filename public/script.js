@@ -26,20 +26,19 @@ function renderEvents(events){
         const li = document.createElement("li");
 
         li.innerHTML = `
-        <b>${unslugify(e.id)}</b> - ${e.inCall ? `In call(${e.participants})` : "Idle"}
-        <button data-join ${(!e.inCall||inCall)?"disabled":""}>Join call</button>
-        <button data-start ${inCall ? "disabled": ""}>Start call</button>`;
+        <b>${unslugify(e.id)}</b> - ${e.inCall ? `(${e.participants})`: "Idle"}
+        <button data-join data-events="${e.id}" ${(!e.inCall || inCall)?"disabled":""}>Join call</button>`;
 
-        li.querySelector("[data-start]").onclick = ()=>{
-            socket.emit("start-call");
-        }
-
-        li.querySelector("[data-join]").onclick = ()=>{
-            socket.emit("join-existing");
+        li.querySelector("[data-join]").onclick = (ev) => {
+            const targetEvent = ev.target.dataset.event;
+            socket.emit("join-existing", {
+                eventId:targetEvent
+            })
         }
         eventsList.appendChild(li);
     }
 
+    start.disabled = inCall;
 }
 
 join.onclick = () =>{
@@ -71,7 +70,13 @@ join.onclick = () =>{
 }
 
 const leave = document.getElementById("leave");
+const start = document.getElementById("start-call");
 
 leave.onclick = () =>{
     socket.emit("leave-call");
+}
+
+start.onclick = () =>{
+    if(inCall) return;
+    socket.emit("start-call");
 }
