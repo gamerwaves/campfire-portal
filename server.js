@@ -95,17 +95,21 @@ io.on("connection", (socket) => {
 
     socket.on("disconnect", ()=>{
         const {eventId} = socket.data;
+        if(!eventId) return;
+        const event = events[eventId];
 
         leaveCall(socket);
-
-        const event = events[eventId];
 
         if(event){
             if(event.hostSocketId === socket.id){
                 io.to(event.roomId).emit("call-ended");
                 delete events[eventId];
+            }else if(!hasSockets(eventId)){
+                delete events[eventId];
             }
         }
+
+        io.emit("events-update", serializeEvents());
     })
 
     socket.on("leave-call", ()=>{
