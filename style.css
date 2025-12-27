@@ -20,12 +20,12 @@
 
 @font-face {
     font-family: 'Dream Planner';
-    src: url('fontsream-planner-font-duo/dreamplanner.otf') format('opentype');
+    src: url('./fonts/dream-planner-font-duo/dreamplanner.otf') format('opentype');
 }
 
 @font-face{
     font-family: 'Ember Fire';
-    src: url('fontsmber-fire-font/ember-fire.otf') format('opentype');
+    src: url('./fonts/ember-fire-font/ember-fire.otf') format('opentype');
 }
 
 #title{
