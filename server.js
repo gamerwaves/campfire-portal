@@ -11,7 +11,7 @@ const io = new Server(httpServer,{
 });
 
 const events = {};
-const apiKey = process.env.API_KEY;
+const apiKey = process.env.DAILY_API_KEY;
 
 async function createRoom(){
     const res = await fetch("https://api.daily.co/v1/rooms",{
