@@ -64,7 +64,7 @@ join.onclick = () =>{
     socket.on("events-update", renderEvents);
     socket.on("join-call", ({roomId})=>{
         document.getElementById("video-container-container").style.display = "block";
-        document.getElementById("container").style.display = "flex";
+        document.getElementById("container").style.display = "none";
         inCall = true;
         currentRoom = roomId;
         leave.hidden = false;
@@ -94,7 +94,7 @@ join.onclick = () =>{
         leave.hidden = true;
         document.getElementById("video-container-container").style.display = "none";
 
-        document.getElementById("container").style.display = "block";
+        document.getElementById("container").style.display = "flex";
 
         if(callFrame){
             callFrame.destroy();
