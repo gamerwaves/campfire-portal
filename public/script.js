@@ -6,6 +6,7 @@ const random = document.getElementById("random");
 const join = document.getElementById("join");
 const campfireName = document.getElementById("event");
 
+
 let socket;
 let currentEvent;
 
@@ -56,13 +57,14 @@ join.onclick = () =>{
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
-    document.getElementById("video-container-container").style.display = "block";
     socket = io("http://localhost:3386");
 
     socket.emit("enter", {eventId: currentEvent});
 
     socket.on("events-update", renderEvents);
     socket.on("join-call", ({roomId})=>{
+        document.getElementById("video-container-container").style.display = "block";
+        document.getElementById("container").style.display = "flex";
         inCall = true;
         currentRoom = roomId;
         leave.hidden = false;
@@ -91,6 +93,8 @@ join.onclick = () =>{
         currentRoom = null;
         leave.hidden = true;
         document.getElementById("video-container-container").style.display = "none";
+
+        document.getElementById("container").style.display = "block";
 
         if(callFrame){
             callFrame.destroy();
