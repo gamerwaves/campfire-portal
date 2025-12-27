@@ -28,22 +28,31 @@
 }
 
 #title{
+    font-family: 'Dream Planner', sans-serif;
+    color: var(--cf-secondary-brown);
     position: relative;
     z-index: 1;
 }
 
 #title h1{
-    font-family: 'Dream Planner', sans-serif;
     font-size: 7rem;
-    margin-top: 0;
+    margin-top: 1rem;
     margin-bottom: 1rem;
-    color: var(--cf-secondary-brown);
+    rotate: -3deg
+}
+
+#title h3{
+    font-size: 3rem;
+    margin-top: -3rem;
+    margin-left: 10rem;
+    rotate: 1deg
 }
 
 #container{
     position: relative;
     margin-top: 8rem;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 40rem;
@@ -70,4 +79,32 @@
 body{
     background: var(--cf-primary-blue) linear-gradient(37deg, var(--cf-primary-blue) 0%, var(--cf-secondary-navy) 100%);
     text-align: center;
+    font-family: "Ember Fire", sans-serif;
+    font-size: 2rem;
+}
+
+input{
+    appearance: none;
+    border: none;
+    height: 2.5rem;
+    background-color: var(--cf-secondary-brown);
+    border-radius: 0.75rem 0.75rem 0.75rem 0.75rem;
+    padding: 0.2rem 0.1rem 0 1rem;
+    font-size: 1.5rem;
+    width: 10rem;
+    font-family: 'Ember Fire', sans-serif;
+    color: var(--white);
+}
+
+button{
+    appearance: none;
+    border: 5px solid var(--cf-secondary-brown);
+    border-radius: 1rem;
+    font-size: 1.5rem;
+    padding: 0.5rem 1rem 0.1rem 1rem;
+    font-family: 'Ember Fire', sans-serif;
+    background-color: var(--cf-primary-orange);
+    color: #7f4b38;
+    font-weight: bold;
+    cursor: pointer;
 }
