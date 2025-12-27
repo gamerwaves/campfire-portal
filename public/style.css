@@ -8,6 +8,36 @@
     --cyan: #5bc0de;
     --blue: #338eda;
     --purple: #a633d6;
+    --cf-primary-blue: #53bfffff;
+    --cf-primary-orange: #ffa23c;
+    --cf-secondary-navy: #384fbc;
+    --cf-secondary-green: #52cb77;
+    --cf-secondary-brown: #ad684f;
+    --cf-secondary-teal: #9be8fe;
+    --cf-secondary-tortoise: #57ecd6;
+}
+
+@font-face {
+    font-family: 'Dream Planner';
+    src: url('./fonts/dream-planner-font-duo/dreamplanner.otf') format('opentype');
+}
+
+@font-face{
+    font-family: 'Ember Fire';
+    src: url('./fonts/ember-fire-font/ember-fire.otf') format('opentype');
+}
+
+#title h1{
+    font-family: 'Dream Planner', sans-serif;
+    font-size: 7rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    color: var(--cf-secondary-brown);
+}
+
+#bg-map{
+    height: 40rem;
+    position: absolute;
 }
 
 #join-container {
@@ -20,6 +50,6 @@
 }
 
 body{
-    /*background-color: #53BFFF;*/
-
+    background: var(--cf-primary-blue) linear-gradient(37deg, var(--cf-primary-blue) 0%, var(--cf-secondary-navy) 100%);
+    text-align: center;
 }
