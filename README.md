@@ -1,10 +1,7 @@
 # campfire portal
 
-a call thingy for campfire events
+a simple call interface designed for all [Campfire](https://campfire.hackclub.com) events to use to video call each other, to see a view of the other events happening all across the world!!
 
-do i need any more
+written with node.js for the backend and regular ol' html css js on the front end
 
-neon said i needed this
-like 17 billion times
-
-grrrrr
+neon is forcing me to write a better readme
