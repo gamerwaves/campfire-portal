@@ -27,17 +27,35 @@
     src: url('./fonts/ember-fire-font/ember-fire.otf') format('opentype');
 }
 
+#title{
+    position: relative;
+    z-index: 1;
+}
+
 #title h1{
     font-family: 'Dream Planner', sans-serif;
     font-size: 7rem;
-    margin-top: 1rem;
+    margin-top: 0;
     margin-bottom: 1rem;
     color: var(--cf-secondary-brown);
 }
 
-#bg-map{
+#container{
+    position: relative;
+    margin-top: 8rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     height: 40rem;
+}
+
+#bg-map{
     position: absolute;
+    inset: 0;
+    margin: auto;
+    height: 100%;
+    object-fit: contain;
+    z-index: -1;
 }
 
 #join-container {
