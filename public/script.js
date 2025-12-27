@@ -108,6 +108,9 @@ join.onclick = () =>{
         currentRoom = null;
         leave.hidden = true;
 
+        document.getElementById("video-container-container").style.display = "none";
+        document.getElementById("container").style.display = "flex";
+
         if(callFrame){
             callFrame.destroy();
             callFrame = null;
