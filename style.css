@@ -20,12 +20,12 @@
 
 @font-face {
     font-family: 'Dream Planner';
-    src: url('./fonts/dream-planner-font-duo/dreamplanner.otf') format('opentype');
+    src: url('fontsream-planner-font-duo/dreamplanner.otf') format('opentype');
 }
 
 @font-face{
     font-family: 'Ember Fire';
-    src: url('./fonts/ember-fire-font/ember-fire.otf') format('opentype');
+    src: url('fontsmber-fire-font/ember-fire.otf') format('opentype');
 }
 
 #title{
@@ -163,7 +163,7 @@ button[disabled]{
     z-index: 5;
     margin-top: 1rem;
     font-size: 3rem;
-    background-image: url("./img/6b9fac5393c544d2382fbf75e185bc83da7017f9.png")
+    background-image: url("imgb9fac5393c544d2382fbf75e185bc83da7017f9.png")
 }
 
 #video-container-container{
