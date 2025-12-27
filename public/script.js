@@ -56,6 +56,7 @@ join.onclick = () =>{
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
+    document.getElementById("video-container-container").style.display = "block";
     socket = io("http://localhost:3386");
 
     socket.emit("enter", {eventId: currentEvent});
@@ -89,6 +90,7 @@ join.onclick = () =>{
         inCall = false;
         currentRoom = null;
         leave.hidden = true;
+        document.getElementById("video-container-container").style.display = "none";
 
         if(callFrame){
             callFrame.destroy();
