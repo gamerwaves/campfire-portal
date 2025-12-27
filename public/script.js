@@ -54,7 +54,9 @@ join.onclick = () =>{
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
-    socket = io("http://localhost:3386");
+    socket = io("https://mackerel-moved-elephant.ngrok-free.app", {
+        transports:["websocket", "polling"]
+    });
 
     socket.emit("enter", {eventId: currentEvent, eventName: name});
 

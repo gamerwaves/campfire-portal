@@ -7,8 +7,22 @@ import "dotenv/config";
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer,{
-    cors: {origin: "*"}
+
+const origins = ["http://astra-the-boop.github.io", "https://astra-the-boop.github.io/campfire-portal/public", "https://astra-the-boop.github.io/campfire-portal"]
+
+const io = new Server(httpServer, {
+    cors: {
+        origin(origin, callback) {
+            if(!origin) return callback(null, true);
+            if(origins.includes(origin)){
+                return callback(null, true);
+            }
+
+            console.warn(`Blocked socket.io origin ${origin}`);
+            return callback(new Error("Not allowed by CORS"));
+        },
+        methods: ["GET", "POST"]
+    }
 });
 
 const events = {};
@@ -109,7 +123,7 @@ io.on("connection", (socket) => {
 
         events[eventId] ??={
             roomId: null,
-            name: eventName,
+            name: eventName?.trim() || eventId,
         }
 
         io.emit("events-update", serializeEvents());
