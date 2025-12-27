@@ -83,7 +83,10 @@ function serializeEvents(){
         const participants = e.roomId? io.sockets.adapter.rooms.get(e.roomId)?.size??0:0;
 
         return{
-            id, inCall:Boolean(e.roomId),participants
+            id,
+            inCall:Boolean(e.roomId),
+            name:e.name,
+            participants
         }
     });
 }
@@ -101,11 +104,12 @@ async function deleteRoom(roomName){
 }
 
 io.on("connection", (socket) => {
-    socket.on("enter", ({eventId}) => {
+    socket.on("enter", ({eventId, eventName}) => {
         socket.data.eventId = eventId;
 
         events[eventId] ??={
             roomId: null,
+            name: eventName,
         }
 
         io.emit("events-update", serializeEvents());

@@ -19,10 +19,6 @@ function slugify(string){
     return string.toLowerCase().replace(/\s/g, "-");
 }
 
-function unslugify(string){
-    return string.replace(/-/g, " ");
-}
-
 function renderEvents(events){
     eventsList.innerHTML = "";
 
@@ -30,13 +26,13 @@ function renderEvents(events){
         const li = document.createElement("li");
 
         li.innerHTML = `
-        <b>Campfire ${unslugify(e.id)}</b> - ${e.inCall ? `(${e.participants})`: "Idle"}
+        <b>Campfire ${e.name}</b> - ${e.inCall ? `(${e.participants})`: "Idle"}
         <button data-join data-event="${e.id}" ${(!e.inCall || inCall || (e.id === currentEvent))?"disabled":""}>Join call</button>`;
 
         li.querySelector("[data-join]").onclick = (ev) => {
             const targetEvent = ev.target.dataset.event;
             socket.emit("join-existing", {
-                eventId:targetEvent
+                eventId:ev.target.dataset.event
             });
         }
         eventsList.appendChild(li);
@@ -54,12 +50,13 @@ function renderEvents(events){
 join.onclick = () =>{
     document.getElementById("title").style.display = "none";
     const name = campfireName.value.trim();
+    currentEvent = slugify(name);
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
     socket = io("http://localhost:3386");
 
-    socket.emit("enter", {eventId: currentEvent});
+    socket.emit("enter", {eventId: currentEvent, eventName: name});
 
     socket.on("events-update", renderEvents);
     socket.on("join-call", ({roomId})=>{
@@ -84,7 +81,7 @@ join.onclick = () =>{
             }
         )
         callFrame.join({url:roomId,
-        userName: unslugify(`Campfire ${currentEvent}`),});
+        userName: `Campfire ${name}`,});
         console.log(`joined ${roomId}`)
     })
 
