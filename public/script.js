@@ -51,6 +51,7 @@ function renderEvents(events){
 }
 
 join.onclick = () =>{
+    document.getElementById("title").style.display = "none";
     const name = campfireName.value.trim();
     if(!name) return alert("Enter Campfire name");
 

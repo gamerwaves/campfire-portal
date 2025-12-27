@@ -136,3 +136,12 @@ button{
     height: 70rem;
     opacity: 90%
 }
+
+#events{
+    height: 20rem;
+    overflow-y: scroll;
+}
+
+#lobby-container{
+    margin-top: -3rem;
+}
