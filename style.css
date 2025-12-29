@@ -75,6 +75,69 @@
 #video-container{
     width: 100%;
     height: 45rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+#localVideo {
+    width: 300px;
+    height: 200px;
+    border-radius: 10px;
+    margin: 10px;
+    background: #000;
+}
+
+#remoteVideos {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px;
+}
+
+#remoteVideos video {
+    border-radius: 10px;
+    background: #000;
+}
+
+#video-controls {
+    position: absolute;
+    bottom: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+.control-btn {
+    font-size: 2rem;
+    padding: 15px;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--cf-primary-orange);
+    border: 3px solid var(--cf-secondary-brown);
+    color: var(--cf-secondary-brown);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.control-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+.control-btn.disabled {
+    background-color: #dc3545;
+    border-color: #721c24;
+    color: white;
+}
+
+.control-btn:hover {
+    transform: scale(1.1);
 }
 
 body{

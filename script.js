@@ -6,14 +6,157 @@ const random = document.getElementById("random");
 const join = document.getElementById("join");
 const campfireName = document.getElementById("event");
 
-
 let socket;
 let currentEvent;
 
 let inCall = false;
 let currentRoom = null;
-let callFrame = null;
+let localStream = null;
+let peerConnections = {};
+let isAudioEnabled = false; // Start with audio muted
+let isVideoEnabled = true; // Start with video enabled
 
+// Audio analysis for waveforms
+let audioContext = null;
+let localAnalyser = null;
+let remoteAnalysers = {};
+let waveformAnimations = {};
+
+const localVideo = document.getElementById('localVideo');
+const remoteVideos = document.getElementById('remoteVideos');
+const toggleAudio = document.getElementById('toggleAudio');
+const toggleVideo = document.getElementById('toggleVideo');
+
+// WebRTC configuration
+const rtcConfig = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
+
+// Audio waveform functions
+function initAudioContext() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function createWaveform(containerId, isLocal = false) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 100;
+    canvas.height = 30;
+    canvas.style.position = 'absolute';
+    canvas.style.top = '8px';
+    canvas.style.right = '8px';
+    canvas.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    canvas.style.borderRadius = '4px';
+    canvas.style.zIndex = '11';
+    
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.appendChild(canvas);
+    }
+    
+    return canvas;
+}
+
+function setupLocalAudioAnalysis() {
+    if (!localStream || !audioContext) return;
+    
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+    
+    try {
+        const source = audioContext.createMediaStreamSource(localStream);
+        localAnalyser = audioContext.createAnalyser();
+        localAnalyser.fftSize = 256;
+        source.connect(localAnalyser);
+        
+        const canvas = createWaveform('local-video-container', true);
+        if (canvas) {
+            startWaveformAnimation(canvas, localAnalyser, 'local');
+        }
+    } catch (error) {
+        console.error('Error setting up local audio analysis:', error);
+    }
+}
+
+function setupRemoteAudioAnalysis(userId, stream) {
+    if (!audioContext) return;
+    
+    const audioTrack = stream.getAudioTracks()[0];
+    if (!audioTrack) return;
+    
+    try {
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        
+        remoteAnalysers[userId] = analyser;
+        
+        const canvas = createWaveform(`remote-container-${userId}`);
+        if (canvas) {
+            startWaveformAnimation(canvas, analyser, userId);
+        }
+    } catch (error) {
+        console.error(`Error setting up remote audio analysis for ${userId}:`, error);
+    }
+}
+
+function startWaveformAnimation(canvas, analyser, id) {
+    const ctx = canvas.getContext('2d');
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    function animate() {
+        if (!waveformAnimations[id]) return;
+        
+        requestAnimationFrame(animate);
+        
+        analyser.getByteFrequencyData(dataArray);
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        const barWidth = canvas.width / bufferLength * 2;
+        let x = 0;
+        
+        // Calculate average volume for color intensity
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+        const intensity = Math.min(average / 128, 1);
+        
+        // Draw waveform bars
+        for (let i = 0; i < bufferLength; i += 2) {
+            const barHeight = (dataArray[i] / 255) * canvas.height;
+            
+            // Color based on intensity - green to red
+            const red = Math.floor(intensity * 255);
+            const green = Math.floor((1 - intensity) * 255);
+            ctx.fillStyle = `rgb(${red}, ${green}, 50)`;
+            
+            ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+            x += barWidth + 1;
+        }
+    }
+    
+    waveformAnimations[id] = true;
+    animate();
+}
+
+function stopWaveformAnimation(id) {
+    waveformAnimations[id] = false;
+    delete waveformAnimations[id];
+    
+    if (id !== 'local') {
+        delete remoteAnalysers[id];
+    }
+}
 
 function joinEvent(){
     document.getElementById("title").style.display = "none";
@@ -22,56 +165,80 @@ function joinEvent(){
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
-    socket = io("https://mackerel-moved-elephant.ngrok-free.app", {
+    socket = io("http://localhost:3386", {
         transports:["websocket", "polling"]
     });
 
     socket.emit("enter", {eventId: currentEvent, eventName: name});
 
     socket.on("events-update", renderEvents);
-    socket.on("join-call", ({roomId})=>{
+    
+    socket.on("join-call", async ({roomId, existingUsers}) => {
         document.getElementById("video-container-container").style.display = "block";
         document.getElementById("container").style.display = "none";
         inCall = true;
         currentRoom = roomId;
         leave.hidden = false;
 
-        if(callFrame){
-            callFrame.destroy();
+        // Set local user's city name
+        const localNameLabel = document.getElementById('local-name-label');
+        if (localNameLabel) {
+            localNameLabel.textContent = campfireName.value.trim() || 'You';
         }
 
-        callFrame = DailyIframe.createFrame(
-            document.getElementById("video-container"),{
-                showLeaveButton: false,
-                iframeStyle:{
-                    width: "100%",
-                    height: "100%",
-                    border: "0"
-                }
+        await startLocalVideo();
+        
+        // Small delay to ensure local stream is ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Create offers to existing users in the room
+        if (existingUsers && existingUsers.length > 0) {
+            console.log(`Creating offers to ${existingUsers.length} existing users:`, existingUsers);
+            for (const user of existingUsers) {
+                await createOfferToPeer(user.userId, user.userName);
             }
-        )
-        callFrame.join({url:roomId,
-            userName: `Campfire ${name}`,});
+        }
+        
         console.log(`joined ${roomId}`)
-    })
+    });
 
-    socket.on("left-call", () =>{
+    // WebRTC signaling events
+    socket.on("webrtc-offer", async ({offer, from, fromUserName}) => {
+        await handleOffer(offer, from, fromUserName);
+    });
+
+    socket.on("webrtc-answer", async ({answer, from, fromUserName}) => {
+        await handleAnswer(answer, from);
+    });
+
+    socket.on("webrtc-ice-candidate", async ({candidate, from}) => {
+        await handleIceCandidate(candidate, from);
+    });
+
+    socket.on("user-joined", async ({userId, userName}) => {
+        console.log(`User joined: ${userId} (${userName}), creating offer...`);
+        // Small delay to ensure both users have their streams ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await createOfferToPeer(userId, userName);
+    });
+
+    socket.on("user-left", ({userId}) => {
+        removePeerConnection(userId);
+    });
+
+    socket.on("left-call", () => {
         inCall = false;
         currentRoom = null;
         leave.hidden = true;
         document.getElementById("video-container-container").style.display = "none";
-
         document.getElementById("container").style.display = "flex";
 
-        if(callFrame){
-            callFrame.destroy();
-            callFrame = null;
-        }
-
+        stopLocalVideo();
+        closeAllConnections();
         console.log("left call");
     });
 
-    socket.on("call-ended", ()=>{
+    socket.on("call-ended", () => {
         inCall = false;
         currentRoom = null;
         leave.hidden = true;
@@ -79,21 +246,227 @@ function joinEvent(){
         document.getElementById("video-container-container").style.display = "none";
         document.getElementById("container").style.display = "flex";
 
-        if(callFrame){
-            callFrame.destroy();
-            callFrame = null;
-        }
-
+        stopLocalVideo();
+        closeAllConnections();
         alert("The host has left the call")
-    })
+    });
 
-
-    socket.on("no-random-calls", ()=>{
+    socket.on("no-random-calls", () => {
         alert("No Campfires active right now - try starting one!");
-    })
+    });
 
     joinContainer.hidden = true;
     lobbyContainer.hidden = false;
+}
+
+async function startLocalVideo() {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+        });
+        
+        // Start with audio disabled but video enabled so people can see each other
+        localStream.getAudioTracks().forEach(track => track.enabled = false);
+        localStream.getVideoTracks().forEach(track => track.enabled = true);
+        
+        // Update the UI state
+        isAudioEnabled = false;
+        isVideoEnabled = true;
+        toggleAudio.classList.add('disabled');
+        toggleVideo.classList.remove('disabled');
+        
+        localVideo.srcObject = localStream;
+        
+        // Initialize audio context and setup local waveform
+        initAudioContext();
+        setupLocalAudioAnalysis();
+        
+        console.log('Local video started, video enabled:', isVideoEnabled);
+    } catch (error) {
+        console.error('Error accessing media devices:', error);
+        alert('Could not access camera/microphone. Please check permissions.');
+    }
+}
+
+function stopLocalVideo() {
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+        localVideo.srcObject = null;
+    }
+    
+    // Stop local waveform animation
+    stopWaveformAnimation('local');
+    localAnalyser = null;
+}
+
+function createPeerConnection(userId, userName = 'Unknown') {
+    console.log(`Creating peer connection for: ${userId} (${userName})`);
+    const peerConnection = new RTCPeerConnection(rtcConfig);
+    peerConnections[userId] = peerConnection;
+
+    // Add local stream to peer connection
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            console.log(`Adding local track to peer ${userId}: ${track.kind}, enabled: ${track.enabled}`);
+            peerConnection.addTrack(track, localStream);
+        });
+    }
+
+    // Handle remote stream
+    peerConnection.ontrack = (event) => {
+        console.log(`Received remote stream from: ${userId} (${userName})`, event);
+        const remoteStream = event.streams[0];
+        addRemoteVideo(userId, userName, remoteStream);
+    };
+
+    // Handle ICE candidates
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            socket.emit("webrtc-ice-candidate", {
+                candidate: event.candidate,
+                to: userId
+            });
+        }
+    };
+
+    // Handle connection state changes
+    peerConnection.onconnectionstatechange = () => {
+        console.log(`Connection state with ${userId} (${userName}): ${peerConnection.connectionState}`);
+    };
+
+    return peerConnection;
+}
+
+async function createOfferToPeer(userId, userName = 'Unknown') {
+    console.log(`Creating offer to peer: ${userId} (${userName})`);
+    const peerConnection = createPeerConnection(userId, userName);
+    
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    
+    socket.emit("webrtc-offer", {
+        offer: offer,
+        to: userId
+    });
+}
+
+async function handleOffer(offer, from, fromUserName = 'Unknown') {
+    console.log(`Received offer from: ${from} (${fromUserName})`);
+    const peerConnection = createPeerConnection(from, fromUserName);
+    
+    await peerConnection.setRemoteDescription(offer);
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    
+    console.log(`Sending answer to: ${from} (${fromUserName})`);
+    socket.emit("webrtc-answer", {
+        answer: answer,
+        to: from
+    });
+}
+
+async function handleAnswer(answer, from) {
+    console.log(`Received answer from: ${from}`);
+    const peerConnection = peerConnections[from];
+    if (peerConnection) {
+        await peerConnection.setRemoteDescription(answer);
+    }
+}
+
+async function handleIceCandidate(candidate, from) {
+    console.log(`Received ICE candidate from: ${from}`);
+    const peerConnection = peerConnections[from];
+    if (peerConnection) {
+        await peerConnection.addIceCandidate(candidate);
+    }
+}
+
+function addRemoteVideo(userId, userName, stream) {
+    console.log(`Adding remote video for user: ${userId} (${userName})`, stream);
+    let remoteVideoContainer = document.getElementById(`remote-container-${userId}`);
+    
+    if (!remoteVideoContainer) {
+        // Create container for video and label
+        remoteVideoContainer = document.createElement('div');
+        remoteVideoContainer.id = `remote-container-${userId}`;
+        remoteVideoContainer.style.position = 'relative';
+        remoteVideoContainer.style.display = 'inline-block';
+        remoteVideoContainer.style.margin = '10px';
+        
+        // Create video element
+        const remoteVideo = document.createElement('video');
+        remoteVideo.id = `remote-${userId}`;
+        remoteVideo.autoplay = true;
+        remoteVideo.playsinline = true;
+        remoteVideo.style.width = '300px';
+        remoteVideo.style.height = '200px';
+        remoteVideo.style.border = '2px solid #fff';
+        remoteVideo.style.borderRadius = '8px';
+        
+        // Create label for city name
+        const nameLabel = document.createElement('div');
+        nameLabel.id = `name-${userId}`;
+        nameLabel.textContent = userName;
+        nameLabel.style.position = 'absolute';
+        nameLabel.style.bottom = '8px';
+        nameLabel.style.left = '8px';
+        nameLabel.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        nameLabel.style.color = 'white';
+        nameLabel.style.padding = '4px 8px';
+        nameLabel.style.borderRadius = '4px';
+        nameLabel.style.fontSize = '14px';
+        nameLabel.style.fontWeight = 'bold';
+        nameLabel.style.zIndex = '10';
+        
+        remoteVideoContainer.appendChild(remoteVideo);
+        remoteVideoContainer.appendChild(nameLabel);
+        remoteVideos.appendChild(remoteVideoContainer);
+        
+        console.log(`Created new video element for user: ${userId} (${userName})`);
+    }
+    
+    const remoteVideo = document.getElementById(`remote-${userId}`);
+    remoteVideo.srcObject = stream;
+    
+    // Setup audio waveform for this remote user
+    setupRemoteAudioAnalysis(userId, stream);
+    
+    // Log track information
+    const videoTracks = stream.getVideoTracks();
+    const audioTracks = stream.getAudioTracks();
+    console.log(`Remote stream tracks - Video: ${videoTracks.length}, Audio: ${audioTracks.length}`);
+    videoTracks.forEach((track, index) => {
+        console.log(`Video track ${index}: enabled=${track.enabled}, readyState=${track.readyState}`);
+    });
+}
+
+function removePeerConnection(userId) {
+    if (peerConnections[userId]) {
+        peerConnections[userId].close();
+        delete peerConnections[userId];
+    }
+    
+    // Stop waveform animation for this user
+    stopWaveformAnimation(userId);
+    
+    const remoteVideoContainer = document.getElementById(`remote-container-${userId}`);
+    if (remoteVideoContainer) {
+        remoteVideoContainer.remove();
+    }
+}
+
+function closeAllConnections() {
+    Object.keys(peerConnections).forEach(userId => {
+        removePeerConnection(userId);
+    });
+    remoteVideos.innerHTML = '';
+    
+    // Clear all waveform animations
+    Object.keys(waveformAnimations).forEach(id => {
+        stopWaveformAnimation(id);
+    });
 }
 
 function slugify(string){
@@ -111,9 +484,8 @@ function renderEvents(events){
         <button data-join data-event="${e.id}" ${(!e.inCall || inCall || (e.id === currentEvent))?"disabled":""}>Join call</button>`;
 
         li.querySelector("[data-join]").onclick = (ev) => {
-            const targetEvent = ev.target.dataset.event;
             socket.emit("join-existing", {
-                eventId:ev.target.dataset.event
+                eventId: ev.target.dataset.event
             });
         }
         eventsList.appendChild(li);
@@ -128,28 +500,67 @@ function renderEvents(events){
     random.disabled = inCall;
 }
 
-join.onclick = () =>{
+join.onclick = () => {
     joinEvent();
 }
 
 const leave = document.getElementById("leave");
 const start = document.getElementById("start-call");
 
-leave.onclick = () =>{
+leave.onclick = () => {
+    stopLocalVideo();
+    closeAllConnections();
     socket.emit("leave-call");
 }
 
-start.onclick = () =>{
+start.onclick = async () => {
     if(inCall) return;
-    socket.emit("start-call", {eventId:currentEvent});
+    socket.emit("start-call", {eventId: currentEvent});
 }
 
-random.onclick = () =>{
+random.onclick = () => {
     if(inCall) return;
     socket.emit("join-random");
 }
 
-campfireName.addEventListener("focus", () =>{
+// Media controls
+toggleAudio.onclick = () => {
+    if (localStream) {
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            isAudioEnabled = audioTrack.enabled;
+            
+            if (isAudioEnabled) {
+                toggleAudio.classList.remove('disabled');
+                // Resume audio context if needed
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+            } else {
+                toggleAudio.classList.add('disabled');
+            }
+        }
+    }
+}
+
+toggleVideo.onclick = () => {
+    if (localStream) {
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            isVideoEnabled = videoTrack.enabled;
+            
+            if (isVideoEnabled) {
+                toggleVideo.classList.remove('disabled');
+            } else {
+                toggleVideo.classList.add('disabled');
+            }
+        }
+    }
+}
+
+campfireName.addEventListener("focus", () => {
     document.addEventListener("keydown", e => {
         if(e.key==="Enter"){
             joinEvent()

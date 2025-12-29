@@ -2,13 +2,13 @@ import express from "express";
 import {createServer} from "http";
 import {Server} from "socket.io";
 import crypto from "crypto"
-import fetch from "node-fetch";
 import "dotenv/config";
 
 const app = express();
+app.use(express.static('.'));
 const httpServer = createServer(app);
 
-const origins = ["https://astra-the-boop.github.io"]
+const origins = ["https://astra-the-boop.github.io", "http://localhost", "http://localhost:3386", "http://dwait.local:3386"]
 
 const io = new Server(httpServer, {
     cors: {
@@ -26,35 +26,12 @@ const io = new Server(httpServer, {
 });
 
 const events = {};
-const apiKey = process.env.DAILY_API_KEY;
 
-console.log(Boolean(process.env.DAILY_API_KEY));
-
-async function createRoom(){
-    const res = await fetch("https://api.daily.co/v1/rooms",{
-        method: "POST",
-        headers:{
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            properties:{
-                exp: Math.floor(Date.now()/1000)+60*60*5,
-                enable_chat: true,
-                start_audio_off: false,
-                start_video_off: false,
-            }
-        })
-    });
-
-    const data = await res.json();
-
-    if(!data.url){
-        console.log('Daily room creation failed', data);
-        return null;
-    }
-
-    return data;
+// Generate a unique room name for Jitsi
+function generateRoomName() {
+    const timestamp = Date.now();
+    const random = crypto.randomBytes(12).toString('hex');
+    return `CampfirePortal${timestamp}${random}`;
 }
 
 function getRandom(eventId){
@@ -105,21 +82,10 @@ function serializeEvents(){
     });
 }
 
-async function deleteRoom(roomName){
-    if(!roomName) return;
-
-    await fetch(`https://api.daily.co/v1/rooms/${roomName}`,{
-        method: "DELETE",
-        headers:{
-            "Authorization": `Bearer ${apiKey}`
-        }
-    })
-    console.log(`deleted ${roomName}`);
-}
-
 io.on("connection", (socket) => {
     socket.on("enter", ({eventId, eventName}) => {
         socket.data.eventId = eventId;
+        socket.data.userName = eventName?.trim() || eventId;
 
         events[eventId] ??={
             roomId: null,
@@ -136,23 +102,40 @@ io.on("connection", (socket) => {
         leaveCall(socket);
 
         if (!event.roomId) {
-            const dailyRoom = await createRoom();
-            if(!dailyRoom) return;
-            event.roomId = dailyRoom.url;
-            event.roomName = dailyRoom.name;
+            // Generate a unique room name
+            const roomName = generateRoomName();
+            event.roomId = roomName;
             event.hostSocketId = socket.id;
+            console.log(`Created new room: ${roomName} for event: ${eventId}`);
         }
 
         socket.data.inCall = true;
         socket.data.roomId = event.roomId;
 
+        // Get existing users in the room with their names
+        const room = io.sockets.adapter.rooms.get(event.roomId);
+        const existingUsers = room ? Array.from(room).filter(id => id !== socket.id).map(id => {
+            const userSocket = io.sockets.sockets.get(id);
+            return {
+                userId: id,
+                userName: userSocket?.data?.userName || 'Unknown'
+            };
+        }) : [];
+        console.log(`User ${socket.id} joining room ${event.roomId}, existing users: ${existingUsers.length}`);
+
         socket.join(event.roomId);
 
-        socket.emit("join-call", {roomId: event.roomId});
+        // Notify existing users in the room about new user
+        socket.to(event.roomId).emit("user-joined", {
+            userId: socket.id, 
+            userName: socket.data.userName
+        });
+
+        socket.emit("join-call", {roomId: event.roomId, existingUsers});
         io.emit("events-update", serializeEvents());
     })
 
-    socket.on("join-existing", ({eventId})=>{
+    socket.on("join-existing", ({eventId}) => {
         const event = events[eventId];
         if(!event?.roomId) return;
 
@@ -161,23 +144,65 @@ io.on("connection", (socket) => {
         socket.data.inCall = true;
         socket.data.roomId = event.roomId;
 
+        // Get existing users in the room with their names
+        const room = io.sockets.adapter.rooms.get(event.roomId);
+        const existingUsers = room ? Array.from(room).filter(id => id !== socket.id).map(id => {
+            const userSocket = io.sockets.sockets.get(id);
+            return {
+                userId: id,
+                userName: userSocket?.data?.userName || 'Unknown'
+            };
+        }) : [];
+        console.log(`User ${socket.id} joining existing room ${event.roomId}, existing users: ${existingUsers.length}`);
+
         socket.join(event.roomId);
 
-        socket.emit("join-call", {roomId: event.roomId});
+        // Notify existing users in the room about new user
+        socket.to(event.roomId).emit("user-joined", {
+            userId: socket.id, 
+            userName: socket.data.userName
+        });
+
+        socket.emit("join-call", {roomId: event.roomId, existingUsers});
         io.emit("events-update", serializeEvents());
     })
 
+    // WebRTC signaling
+    socket.on("webrtc-offer", ({offer, to}) => {
+        socket.to(to).emit("webrtc-offer", {
+            offer, 
+            from: socket.id, 
+            fromUserName: socket.data.userName
+        });
+    });
+
+    socket.on("webrtc-answer", ({answer, to}) => {
+        socket.to(to).emit("webrtc-answer", {
+            answer, 
+            from: socket.id, 
+            fromUserName: socket.data.userName
+        });
+    });
+
+    socket.on("webrtc-ice-candidate", ({candidate, to}) => {
+        socket.to(to).emit("webrtc-ice-candidate", {candidate, from: socket.id});
+    });
+
     socket.on("disconnect", async () => {
-        const {eventId} = socket.data;
+        const {eventId, roomId} = socket.data;
         if (!eventId) return;
         const event = events[eventId];
+
+        // Notify other users in the room that this user left
+        if (roomId) {
+            socket.to(roomId).emit("user-left", {userId: socket.id});
+        }
 
         leaveCall(socket);
 
         if (event) {
             if (event.hostSocketId === socket.id) {
                 io.to(event.roomId).emit("call-ended");
-                await deleteRoom(event.roomName);
                 delete events[eventId];
             } else if (!hasSockets(eventId)) {
                 delete events[eventId];
@@ -187,7 +212,14 @@ io.on("connection", (socket) => {
         io.emit("events-update", serializeEvents());
     })
 
-    socket.on("leave-call", ()=>{
+    socket.on("leave-call", () => {
+        const {roomId} = socket.data;
+        
+        // Notify other users in the room that this user left
+        if (roomId) {
+            socket.to(roomId).emit("user-left", {userId: socket.id});
+        }
+        
         leaveCall(socket);
 
         const {eventId} = socket.data;
@@ -217,8 +249,25 @@ io.on("connection", (socket) => {
         socket.data.inCall = true;
         socket.data.roomId = event.roomId;
 
+        // Get existing users in the room with their names
+        const room = io.sockets.adapter.rooms.get(event.roomId);
+        const existingUsers = room ? Array.from(room).filter(id => id !== socket.id).map(id => {
+            const userSocket = io.sockets.sockets.get(id);
+            return {
+                userId: id,
+                userName: userSocket?.data?.userName || 'Unknown'
+            };
+        }) : [];
+
         socket.join(event.roomId);
-        socket.emit("join-call", {roomId: event.roomId});
+        
+        // Notify existing users in the room about new user
+        socket.to(event.roomId).emit("user-joined", {
+            userId: socket.id, 
+            userName: socket.data.userName
+        });
+        
+        socket.emit("join-call", {roomId: event.roomId, existingUsers});
 
         io.emit("events-update", serializeEvents());
     })
