@@ -188,7 +188,7 @@ function joinEvent(){
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
-    socket = io("https://2ae32e21bfbd.ngrok-free.app", {
+    socket = io("https://campfire-portal-socket.vercel.app", {
         transports:["websocket", "polling"]
     });
 

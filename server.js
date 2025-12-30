@@ -8,7 +8,7 @@ const app = express();
 app.use(express.static('.'));
 const httpServer = createServer(app);
 
-const origins = ["https://astra-the-boop.github.io", "http://localhost", "http://localhost:3386", "http://dwait.local:3386","https://2ae32e21bfbd.ngrok-free.app"]
+const origins = ["https://astra-the-boop.github.io", "http://localhost", "http://localhost:3386", "http://dwait.local:3386","https://2ae32e21bfbd.ngrok-free.app", "https://campfire-portal.vercel.app", "http://localhost:3001"]
 
 const io = new Server(httpServer, {
     cors: {
