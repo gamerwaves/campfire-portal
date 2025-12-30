@@ -188,7 +188,7 @@ function joinEvent(){
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
-    socket = io("https://campfire-portal-socket.vercel.app", {
+    socket = io("https://campfire-portal.fly.dev", {
         transports:["websocket", "polling"]
     });
 

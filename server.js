@@ -294,6 +294,6 @@ io.on("connection", (socket) => {
     })
 })
 
-httpServer.listen(3386, ()=>{
-    console.log("Server started on port 3386");
+httpServer.listen(3000, ()=>{
+    console.log("Server started on port 3000");
 });
