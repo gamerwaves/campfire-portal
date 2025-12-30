@@ -8,7 +8,7 @@ const app = express();
 app.use(express.static('.'));
 const httpServer = createServer(app);
 
-const origins = ["https://astra-the-boop.github.io", "http://localhost", "http://localhost:3386", "http://dwait.local:3386"]
+const origins = ["https://astra-the-boop.github.io", "http://localhost", "http://localhost:3386", "http://dwait.local:3386","https://2ae32e21bfbd.ngrok-free.app"]
 
 const io = new Server(httpServer, {
     cors: {
@@ -101,13 +101,11 @@ io.on("connection", (socket) => {
 
         leaveCall(socket);
 
-        if (!event.roomId) {
-            // Generate a unique room name
-            const roomName = generateRoomName();
-            event.roomId = roomName;
-            event.hostSocketId = socket.id;
-            console.log(`Created new room: ${roomName} for event: ${eventId}`);
-        }
+        // Always create a new room when starting a call
+        const roomName = generateRoomName();
+        event.roomId = roomName;
+        event.hostSocketId = socket.id;
+        console.log(`Created new room: ${roomName} for event: ${eventId}`);
 
         socket.data.inCall = true;
         socket.data.roomId = event.roomId;
@@ -198,13 +196,22 @@ io.on("connection", (socket) => {
             socket.to(roomId).emit("user-left", {userId: socket.id});
         }
 
+        // Check if this user is the host BEFORE calling leaveCall
+        const isHost = event && event.hostSocketId === socket.id;
+        const currentRoomId = roomId; // Store roomId before leaveCall clears it
+
         leaveCall(socket);
 
         if (event) {
-            if (event.hostSocketId === socket.id) {
-                io.to(event.roomId).emit("call-ended");
-                delete events[eventId];
+            if (isHost) {
+                // Host is leaving, end the call for everyone but keep the event
+                console.log(`Host ${socket.id} leaving, ending call for room ${currentRoomId}`);
+                io.to(currentRoomId).emit("call-ended");
+                // Reset the event but don't delete it
+                event.roomId = null;
+                event.hostSocketId = null;
             } else if (!hasSockets(eventId)) {
+                // No one left in this event, clean it up
                 delete events[eventId];
             }
         }
@@ -213,7 +220,12 @@ io.on("connection", (socket) => {
     })
 
     socket.on("leave-call", () => {
-        const {roomId} = socket.data;
+        const {roomId, eventId} = socket.data;
+        const event = events[eventId];
+        
+        // Check if this user is the host BEFORE calling leaveCall
+        const isHost = event && event.hostSocketId === socket.id;
+        const currentRoomId = roomId; // Store roomId before leaveCall clears it
         
         // Notify other users in the room that this user left
         if (roomId) {
@@ -222,9 +234,18 @@ io.on("connection", (socket) => {
         
         leaveCall(socket);
 
-        const {eventId} = socket.data;
-        if(eventId && !hasSockets(eventId)){
-            delete events[eventId];
+        if (event) {
+            if (isHost) {
+                // Host is leaving, end the call for everyone but keep the event
+                console.log(`Host ${socket.id} manually leaving, ending call for room ${currentRoomId}`);
+                io.to(currentRoomId).emit("call-ended");
+                // Reset the event but don't delete it
+                event.roomId = null;
+                event.hostSocketId = null;
+            } else if (!hasSockets(eventId)) {
+                // No one left in this event, clean it up
+                delete events[eventId];
+            }
         }
 
         socket.emit("left-call");

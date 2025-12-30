@@ -233,3 +233,30 @@ button[disabled]{
     text-align: center;
     align-items: center;
 }
+
+.camera-select {
+    appearance: none;
+    border: 3px solid var(--cf-secondary-brown);
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    font-family: 'Ember Fire', sans-serif;
+    background-color: var(--cf-primary-orange);
+    color: var(--cf-secondary-brown);
+    font-weight: bold;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ad684f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+}
+
+.camera-select:hover {
+    transform: scale(1.05);
+}
+
+.camera-select option {
+    background-color: var(--cf-primary-orange);
+    color: var(--cf-secondary-brown);
+}

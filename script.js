@@ -15,6 +15,7 @@ let localStream = null;
 let peerConnections = {};
 let isAudioEnabled = false; // Start with audio muted
 let isVideoEnabled = true; // Start with video enabled
+let selectedCameraId = null; // Track selected camera
 
 // Audio analysis for waveforms
 let audioContext = null;
@@ -43,19 +44,34 @@ function initAudioContext() {
 }
 
 function createWaveform(containerId, isLocal = false) {
+    // Create a wrapper div for the waveform
+    const waveformId = isLocal ? 'local-video' : containerId.replace('remote-container-', '');
+    const waveformDiv = document.createElement('div');
+    waveformDiv.id = `waveform-${waveformId}`;
+    waveformDiv.style.position = 'absolute';
+    waveformDiv.style.top = '8px';
+    waveformDiv.style.right = '8px';
+    waveformDiv.style.width = '100px';
+    waveformDiv.style.height = '30px';
+    waveformDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    waveformDiv.style.borderRadius = '4px';
+    waveformDiv.style.zIndex = '11';
+    waveformDiv.style.padding = '2px';
+    waveformDiv.style.boxSizing = 'border-box';
+    
+    // Create the canvas inside the div
     const canvas = document.createElement('canvas');
-    canvas.width = 100;
-    canvas.height = 30;
-    canvas.style.position = 'absolute';
-    canvas.style.top = '8px';
-    canvas.style.right = '8px';
-    canvas.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-    canvas.style.borderRadius = '4px';
-    canvas.style.zIndex = '11';
+    canvas.width = 96; // Slightly smaller to account for padding
+    canvas.height = 26;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.borderRadius = '2px';
+    
+    waveformDiv.appendChild(canvas);
     
     const container = document.getElementById(containerId);
     if (container) {
-        container.appendChild(canvas);
+        container.appendChild(waveformDiv);
     }
     
     return canvas;
@@ -156,6 +172,13 @@ function stopWaveformAnimation(id) {
     if (id !== 'local') {
         delete remoteAnalysers[id];
     }
+    
+    // Remove the waveform div - handle local vs remote ID mapping
+    const waveformId = id === 'local' ? 'local-video' : id;
+    const waveformDiv = document.getElementById(`waveform-${waveformId}`);
+    if (waveformDiv) {
+        waveformDiv.remove();
+    }
 }
 
 function joinEvent(){
@@ -165,7 +188,7 @@ function joinEvent(){
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
-    socket = io("http://localhost:3386", {
+    socket = io("https://2ae32e21bfbd.ngrok-free.app", {
         transports:["websocket", "polling"]
     });
 
@@ -259,12 +282,33 @@ function joinEvent(){
     lobbyContainer.hidden = false;
 }
 
+async function getAvailableCameras() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter(device => device.kind === 'videoinput');
+        return cameras;
+    } catch (error) {
+        console.error('Error getting available cameras:', error);
+        return [];
+    }
+}
+
 async function startLocalVideo() {
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true
-        });
+        const constraints = {
+            audio: true,
+            video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
+        
+        // If a camera is selected, use it
+        if (selectedCameraId) {
+            constraints.video.deviceId = { exact: selectedCameraId };
+        }
+        
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
         
         // Start with audio disabled but video enabled so people can see each other
         localStream.getAudioTracks().forEach(track => track.enabled = false);
@@ -291,7 +335,10 @@ async function startLocalVideo() {
 
 function stopLocalVideo() {
     if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
+        // Stop all tracks to properly disconnect camera
+        localStream.getTracks().forEach(track => {
+            track.stop();
+        });
         localStream = null;
         localVideo.srcObject = null;
     }
@@ -544,18 +591,59 @@ toggleAudio.onclick = () => {
     }
 }
 
-toggleVideo.onclick = () => {
-    if (localStream) {
+toggleVideo.onclick = async () => {
+    if (!localStream) return;
+    
+    if (isVideoEnabled) {
+        // Turning OFF - stop the video track completely
         const videoTrack = localStream.getVideoTracks()[0];
         if (videoTrack) {
-            videoTrack.enabled = !videoTrack.enabled;
-            isVideoEnabled = videoTrack.enabled;
+            videoTrack.stop();
+            localStream.removeTrack(videoTrack);
+        }
+        localVideo.srcObject = null;
+        isVideoEnabled = false;
+        toggleVideo.classList.add('disabled');
+        console.log('Video turned OFF');
+    } else {
+        // Turning ON - restart the video stream
+        try {
+            const constraints = {
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false // Don't get audio again
+            };
             
-            if (isVideoEnabled) {
-                toggleVideo.classList.remove('disabled');
-            } else {
-                toggleVideo.classList.add('disabled');
+            if (selectedCameraId) {
+                constraints.video.deviceId = { exact: selectedCameraId };
             }
+            
+            const videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const newVideoTrack = videoStream.getVideoTracks()[0];
+            
+            // Stop any audio tracks from the new stream
+            videoStream.getAudioTracks().forEach(track => track.stop());
+            
+            // Add the new video track to the stream
+            localStream.addTrack(newVideoTrack);
+            localVideo.srcObject = localStream;
+            
+            // Update peer connections with new track
+            Object.values(peerConnections).forEach(peerConnection => {
+                const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) {
+                    sender.replaceTrack(newVideoTrack);
+                }
+            });
+            
+            isVideoEnabled = true;
+            toggleVideo.classList.remove('disabled');
+            console.log('Video turned ON');
+        } catch (error) {
+            console.error('Error restarting video:', error);
+            alert('Could not restart camera. Please check permissions.');
         }
     }
 }
@@ -567,3 +655,77 @@ campfireName.addEventListener("focus", () => {
         }
     })
 })
+
+// Camera source picker
+const cameraSelect = document.getElementById('cameraSelect');
+
+async function populateCameraOptions() {
+    const cameras = await getAvailableCameras();
+    cameraSelect.innerHTML = '<option value="">Select Camera</option>';
+    
+    cameras.forEach((camera, index) => {
+        const option = document.createElement('option');
+        option.value = camera.deviceId;
+        option.textContent = camera.label || `Camera ${index + 1}`;
+        cameraSelect.appendChild(option);
+    });
+    
+    // Select first camera by default
+    if (cameras.length > 0) {
+        selectedCameraId = cameras[0].deviceId;
+        cameraSelect.value = selectedCameraId;
+    }
+}
+
+cameraSelect.addEventListener('change', async (e) => {
+    selectedCameraId = e.target.value;
+    
+    // Only switch camera if video is currently enabled and in a call
+    if (inCall && localStream && isVideoEnabled) {
+        try {
+            // Stop current video track
+            const currentVideoTrack = localStream.getVideoTracks()[0];
+            if (currentVideoTrack) {
+                currentVideoTrack.stop();
+                localStream.removeTrack(currentVideoTrack);
+            }
+            
+            // Get new video stream from selected camera
+            const constraints = {
+                video: {
+                    deviceId: { exact: selectedCameraId },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false // Don't get audio again
+            };
+            
+            const videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const newVideoTrack = videoStream.getVideoTracks()[0];
+            
+            // Stop any audio tracks from the new stream
+            videoStream.getAudioTracks().forEach(track => track.stop());
+            
+            // Add new track to stream
+            localStream.addTrack(newVideoTrack);
+            localVideo.srcObject = localStream;
+            
+            // Update all peer connections with new track
+            Object.values(peerConnections).forEach(peerConnection => {
+                const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) {
+                    sender.replaceTrack(newVideoTrack);
+                }
+            });
+            
+            console.log('Camera switched successfully');
+        } catch (error) {
+            console.error('Error switching camera:', error);
+            alert('Could not switch camera. Please try again.');
+        }
+    }
+});
+
+// Populate cameras when page loads
+navigator.mediaDevices.addEventListener('devicechange', populateCameraOptions);
+populateCameraOptions();
