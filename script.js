@@ -188,9 +188,10 @@ function joinEvent(){
     if(!name) return alert("Enter Campfire name");
 
     currentEvent = slugify(campfireName.value.trim());
-    socket = io("https://campfire-portal.onrender.com", {
-        transports:["websocket", "polling"]
+    socket = io(window.location.origin, {
+        transports: ["websocket", "polling"]
     });
+
 
     socket.emit("enter", {eventId: currentEvent, eventName: name});
 
